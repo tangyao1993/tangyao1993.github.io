@@ -49,7 +49,7 @@
 <link rel="shortcut icon" href="/images/favicon.png">
 
 
-<title>归档集 - 唐耀的技术博客</title>
+<title>bio伪异步 - 唐耀的技术博客</title>
 
 <meta name="keywords" content="">
 
@@ -109,8 +109,22 @@
 </div>
             <div class="page-title">
     <ul>
-        <li><a href="/" data-name="Home" title="Back Home">Home</a></li>
-        <li><a href="/tags" data-name="Tag Cloud" title="Tag Cloud">Tags</a></li>
+        <li><a href="/">最新</a></li>
+        
+            
+                <li class="">
+                    <a href="/categories/big-front-end" data-name="前端">前端</a>
+                </li>
+            
+                <li class="active">
+                    <a href="/categories/server-side" data-name="后台">后台</a>
+                </li>
+            
+                <li class="">
+                    <a href="/categories/note" data-name="随笔">随笔</a>
+                </li>
+            
+        
         <li class="page-search">
     <form id="search" class="search-form">
         <label for="s" class="sr-only">Input Search key Words Here</label>
@@ -152,47 +166,207 @@
 <div class="main-inner">
     <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
         <div class="post-header">
-            <h3 class="post-title">坦率的讲 - 本站目前共计3篇文章</h3>
-        </div>
-        <p><img src="/images/category-bg.jpg" alt="category-bg"></p>
-        <div class="post-content markdown-body" itemprop="articleBody">
-            <div class="archives">
-                
-                
-                
-                
-                
-                <div class="archives-item">
-                    <h2>2017年11月</h2>
-                    <ul class="archives_list">
-                        
-                        <li>25日15:14:03
-                            <a href="/2017/11/25/BIO伪异步/">BIO伪异步</a>
-                        </li>
-                        
-                
-                
-                
-                        <li>16日19:45:30
-                            <a href="/2017/11/16/redis遇到的坑/">redis遇到的坑</a>
-                        </li>
-                        
-                
-                
-                
-                        <li>15日21:11:55
-                            <a href="/2017/11/15/hexo常用操作/">hexo常用操作</a>
-                        </li>
-                        
-                    </ul>
-                </div>
-                
-                
+            <div class="post-author clearfix">
+                <a class="avatar fleft" href="" target="_blank">
+                    <img width="48" src="/images/touxiang.png" alt="tangyao"/>
+                </a>
+                <p><span class="label">作者</span>
+                    <a href="" target="_blank">tangyao</a>
+                    <span title="最后编辑于2017-11-25">2017-11-25</span>
+                </p>
+                <p></p>
+            </div>
+            <h2 class="post-title">BIO伪异步</h2>
+            <div class="post-meta">
+                本文总共4296个字 | 您是第<span id="busuanzi_value_page_pv"><i class="fa fa-spinner fa-spin"></i></span>位看到它们的小伙伴
             </div>
         </div>
-    </article>
-</div>
+        <div class="post-content markdown-body">
+            <h2 id="为什么需要伪异步？"><a href="#为什么需要伪异步？" class="headerlink" title="为什么需要伪异步？"></a>为什么需要伪异步？</h2><p>socket编程中每一个socket客户端去连接服务端的时候就需要开启一个线程进行处理，如果客户端过多服务端开启线程数也会过多，导致服务端资源耗尽崩溃</p>
+<h2 id="实现伪异步io的方法"><a href="#实现伪异步io的方法" class="headerlink" title="实现伪异步io的方法"></a>实现伪异步io的方法</h2><p>通过线程池进行解决<br>实现代码如下：</p>
+<h3 id="客户端代码"><a href="#客户端代码" class="headerlink" title="客户端代码"></a>客户端代码</h3><p>·<br>public class Client {</p>
+<pre><code>final static String ADDRESS = &quot;127.0.0.1&quot;;
+final static int PORT =8765;
 
+public static void main(String[] args) {
+    Socket socket = null;
+    BufferedReader in = null;
+    PrintWriter out = null;
+    try {
+        socket = new Socket(ADDRESS, PORT);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        out = new PrintWriter(socket.getOutputStream(), true);
+
+        out.println(&quot;Client request&quot;);
+
+        String response = in.readLine();
+        System.out.println(&quot;Client:&quot; + response);
+
+
+    }  catch (Exception e) {
+        // TODO Auto-generated catch block
+        e.printStackTrace();
+    } finally {
+        if(in != null){
+            try {
+                in.close();
+            } catch (Exception e1) {
+                e1.printStackTrace();
+            }
+        }
+        if(out != null){
+            try {
+                out.close();
+            } catch (Exception e2) {
+                e2.printStackTrace();
+            }
+        }
+        if(socket != null){
+            try {
+                socket.close();
+            } catch (Exception e3) {
+                e3.printStackTrace();
+            }
+        }
+        socket = null;                
+    }
+
+
+
+}
+</code></pre><p>}<br>·</p>
+<h3 id="服务端处理代码"><a href="#服务端处理代码" class="headerlink" title="服务端处理代码"></a>服务端处理代码</h3><p>·<br>public class ServerHandler implements Runnable {</p>
+<pre><code>private Socket socket;
+public ServerHandler (Socket socket){
+    this.socket = socket;
+}
+
+@Override
+public void run() {
+    BufferedReader in = null;
+    PrintWriter out = null;
+    try {
+        in = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
+        out = new PrintWriter(this.socket.getOutputStream(), true);
+        String body = null;
+        while(true){
+            body = in.readLine();
+            if(body == null) break;
+            System.out.println(&quot;Server:&quot; + body);
+            out.println(&quot;Server response&quot;);
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    } finally {
+        if(in != null){
+            try {
+                in.close();
+            } catch (Exception e1) {
+                e1.printStackTrace();
+            }
+        }
+        if(out != null){
+            try {
+                out.close();
+            } catch (Exception e2) {
+                e2.printStackTrace();
+            }
+        }
+        if(socket != null){
+            try {
+                socket.close();
+            } catch (Exception e3) {
+                e3.printStackTrace();
+            }
+        }
+        socket = null;            
+    }
+
+
+}
+</code></pre><p>}<br>·</p>
+<h3 id="服务端代码"><a href="#服务端代码" class="headerlink" title="服务端代码"></a>服务端代码</h3><p>·<br>public class Server {</p>
+<pre><code>final static int PORT = 8765;
+
+public static void main(String[] args) {
+    ServerSocket server = null;
+    BufferedReader in = null;
+    PrintWriter out = null;
+    try {
+        server = new ServerSocket(PORT);
+        System.out.println(&quot;server start&quot;);
+        Socket socket = null;
+        HandlerExecutorPool executorPool = new HandlerExecutorPool(50, 1000);
+        while(true){
+            socket = server.accept();
+            executorPool.execute(new ServerHandler(socket));
+        }
+
+    } catch (Exception e) {
+        e.printStackTrace();
+    } finally {
+        if(in != null){
+            try {
+                in.close();
+            } catch (Exception e1) {
+                e1.printStackTrace();
+            }
+        }
+        if(out != null){
+            try {
+                out.close();
+            } catch (Exception e2) {
+                e2.printStackTrace();
+            }
+        }
+        if(server != null){
+            try {
+                server.close();
+            } catch (Exception e3) {
+                e3.printStackTrace();
+            }
+        }
+        server = null;                
+    }
+
+
+
+}
+</code></pre><p>}<br>·</p>
+<h3 id="自定义线程池"><a href="#自定义线程池" class="headerlink" title="自定义线程池"></a>自定义线程池</h3><p>·<br>public class HandlerExecutorPool {</p>
+<pre><code>private ExecutorService executor;
+public HandlerExecutorPool(int maxPoolSize, int queueSize){
+    this.executor = new ThreadPoolExecutor(
+            Runtime.getRuntime().availableProcessors(),
+            maxPoolSize, 
+            120L, 
+            TimeUnit.SECONDS,
+            new ArrayBlockingQueue&lt;Runnable&gt;(queueSize));
+}
+
+public void execute(Runnable task){
+    this.executor.execute(task);
+}
+</code></pre><p>}<br>·</p>
+
+        </div>
+        
+        
+        <div class="post-tags">Tags：
+            
+            <a href="/tags/BIO/">BIO</a>
+            
+            <a href="/tags/网络编程/">网络编程</a>
+            
+        </div>
+        
+    </article>
+    
+    <p>本文内容仅作为作者个人兴趣与观点，不代表所在公司及团队的观点和决策。若有不恰当之处，望不吝赐教</p>
+    
+    
+</div>
+<script async src="//dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
         </div><!-- end #main-->
     </div><!-- end #body -->
     <footer class="footer">

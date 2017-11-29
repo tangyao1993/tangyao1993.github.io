@@ -49,7 +49,7 @@
 <link rel="shortcut icon" href="/images/favicon.png">
 
 
-<title>标签 - io - 唐耀的技术博客</title>
+<title>netty:nio框架 - 唐耀的技术博客</title>
 
 <meta name="keywords" content="">
 
@@ -109,21 +109,21 @@
 </div>
             <div class="page-title">
     <ul>
-        <li class="">
-            <a href="/" data-name="最近文章">最近</a>
-        </li>
+        <li><a href="/">最新</a></li>
         
-        <li class="">
-            <a href="/categories/big-front-end" data-name="前端">前端</a>
-        </li>
-        
-        <li class="">
-            <a href="/categories/server-side" data-name="后台">后台</a>
-        </li>
-        
-        <li class="">
-            <a href="/categories/note" data-name="随笔">随笔</a>
-        </li>
+            
+                <li class="">
+                    <a href="/categories/big-front-end" data-name="前端">前端</a>
+                </li>
+            
+                <li class="active">
+                    <a href="/categories/server-side" data-name="后台">后台</a>
+                </li>
+            
+                <li class="">
+                    <a href="/categories/note" data-name="随笔">随笔</a>
+                </li>
+            
         
         <li class="page-search">
     <form id="search" class="search-form">
@@ -164,45 +164,155 @@
     </ul>
 </div>
 <div class="main-inner">
-    
-    
-    
-<article class="post">
-    
-    <div class="post-header">
-        <div class="post-meta">
-            <a href="" target="_blank">
-                <strong>tangyao</strong>
-            </a>
-            <em>·</em>2017-11-25
+    <article class="post" itemscope itemtype="http://schema.org/BlogPosting">
+        <div class="post-header">
+            <div class="post-author clearfix">
+                <a class="avatar fleft" href="" target="_blank">
+                    <img width="48" src="/images/touxiang.png" alt="tangyao"/>
+                </a>
+                <p><span class="label">作者</span>
+                    <a href="" target="_blank">tangyao</a>
+                    <span title="最后编辑于2017-11-29">2017-11-29</span>
+                </p>
+                <p></p>
+            </div>
+            <h2 class="post-title">Netty:NIO框架</h2>
+            <div class="post-meta">
+                本文总共3535个字 | 您是第<span id="busuanzi_value_page_pv"><i class="fa fa-spinner fa-spin"></i></span>位看到它们的小伙伴
+            </div>
         </div>
-        <a class="post-title" href="/2017/11/25/IO、NIO和AIO/" target="_blank" title="IO、NIO和AIO">IO、NIO和AIO</a>
-        <div class="post-meta">
-            <a href="/tags" target="_blank"><i class="fa fa-tags"></i></a>
+        <div class="post-content markdown-body">
+            <p>netty是一种NIO框架，对NIO进行了封装，让NIO使用起来更简便。<br>推荐学习文章：<a href="http://ifeve.com/netty5-user-guide/" target="_blank" rel="external">http://ifeve.com/netty5-user-guide/</a></p>
+<h2 id="Client："><a href="#Client：" class="headerlink" title="Client："></a>Client：</h2><pre><code>public class Client {
+
+    public static void main(String[] args) throws Exception {
+
+        EventLoopGroup workgroup = new NioEventLoopGroup();
+        Bootstrap b = new Bootstrap();
+        b.group(workgroup)
+        .channel(NioSocketChannel.class)
+        .handler(new ChannelInitializer&lt;SocketChannel&gt;() {
+            @Override
+            protected void initChannel(SocketChannel sc) throws Exception {
+                sc.pipeline().addLast(new ClientHandler());
+            }
+        });
+
+        ChannelFuture cf1 = b.connect(&quot;127.0.0.1&quot;, 8765).sync();
+
+        //buf
+        cf1.channel().writeAndFlush(Unpooled.copiedBuffer(&quot;777&quot;.getBytes()));
+
+        cf1.channel().closeFuture().sync();
+        workgroup.shutdownGracefully();
+
+    }
+}
+</code></pre><h2 id="ClientHandler"><a href="#ClientHandler" class="headerlink" title="ClientHandler:"></a>ClientHandler:</h2><pre><code>public class ClientHandler extends ChannelHandlerAdapter {
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        try {
+            //do something msg
+            ByteBuf buf = (ByteBuf)msg;
+            byte[] data = new byte[buf.readableBytes()];
+            buf.readBytes(data);
+            String request = new String(data, &quot;utf-8&quot;);
+            System.out.println(&quot;Client: &quot; + request);
+
+
+        } finally {
+            ReferenceCountUtil.release(msg);
+        }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
+        ctx.close();
+    }
+}
+</code></pre><h2 id="Server"><a href="#Server" class="headerlink" title="Server:"></a>Server:</h2><pre><code>public class Server {
+
+    public static void main(String[] args) throws Exception {
+        //1 第一个线程组 是用于接收Client端连接的
+        EventLoopGroup bossGroup = new NioEventLoopGroup();
+        //2 第二个线程组 是用于实际的业务处理操作的
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+
+        //3 创建一个辅助类Bootstrap，就是对我们的Server进行一系列的配置
+        ServerBootstrap b = new ServerBootstrap(); 
+        //把俩个工作线程组加入进来
+        b.group(bossGroup, workerGroup)
+        //我要指定使用NioServerSocketChannel这种类型的通道
+         .channel(NioServerSocketChannel.class)
+        //一定要使用 childHandler 去绑定具体的 事件处理器
+         .childHandler(new ChannelInitializer&lt;SocketChannel&gt;() {
+            @Override
+            protected void initChannel(SocketChannel sc) throws Exception {
+                sc.pipeline().addLast(new ServerHandler());
+            }
+        });
+
+        //绑定指定的端口 进行监听
+        ChannelFuture f = b.bind(8765).sync(); 
+
+        //Thread.sleep(1000000);
+        f.channel().closeFuture().sync();
+
+        bossGroup.shutdownGracefully();
+        workerGroup.shutdownGracefully();
+
+
+
+    }
+
+}
+</code></pre><h2 id="ServerHandler"><a href="#ServerHandler" class="headerlink" title="ServerHandler:"></a>ServerHandler:</h2><pre><code>public class ServerHandler  extends ChannelHandlerAdapter {
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+
+            //do something msg
+            ByteBuf buf = (ByteBuf)msg;
+            byte[] data = new byte[buf.readableBytes()];
+            buf.readBytes(data);
+            String request = new String(data, &quot;utf-8&quot;);
+            System.out.println(&quot;Server: &quot; + request);
+            //写给客户端
+            String response = &quot;我是反馈的信息&quot;;
+            ctx.writeAndFlush(Unpooled.copiedBuffer(&quot;888&quot;.getBytes()));
+            //.addListener(ChannelFutureListener.CLOSE);
+
+
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
+        ctx.close();
+    }
+
+}
+</code></pre>
+        </div>
+        
+        
+        <div class="post-tags">Tags：
             
-                <em>·</em>
-                <a href="https://tangyao1993.github.io/tags/IO/" target="_blank">IO</a>
+            <a href="/tags/NIO框架/">NIO框架</a>
             
-                <em>·</em>
-                <a href="https://tangyao1993.github.io/tags/NIO/" target="_blank">NIO</a>
-            
-                <em>·</em>
-                <a href="https://tangyao1993.github.io/tags/AIO/" target="_blank">AIO</a>
+            <a href="/tags/Netty/">Netty</a>
             
         </div>
-    </div>
-    <div class="post-desc">
-        IO、NIO和AIO
-    </div>
-</article>
-
-
-
+        
+    </article>
+    
+    <p>本文内容仅作为作者个人兴趣与观点，不代表所在公司及团队的观点和决策。若有不恰当之处，望不吝赐教</p>
+    
     
 </div>
-<!-- 分页开始 -->
-
-
+<script async src="//dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
         </div><!-- end #main-->
     </div><!-- end #body -->
     <footer class="footer">
